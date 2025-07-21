@@ -1,0 +1,22 @@
+{
+  "category.todo_list.keymapping": "Todo List",
+  "key.todo_list.open_todo_list": "Open Todo List",
+  "todo_list.title": "Todo List",
+  "todo_list.add_title": "Add Todo Item",
+  "todo_list.edit_title": "Edit Todo Item",
+  "todo_list.add_button": "Add",
+  "todo_list.save_button": "Save",
+  "todo_list.edit": "Edit",
+  "todo_list.delete": "Delete",
+  "todo_list.pin": "Pin",
+  "todo_list.unpin": "Unpin",
+  "todo_list.overlay_title": "Todo List",
+  "todo_list.overlay_empty": "No todo items",
+  "todo_list.add_item": "Description",
+  "todo_list.title_hint": "Enter title...",
+  "todo_list.title_label": "Title",
+  "todo_list.description_label": "Description",
+  "todo_list.description_hint": "Enter detailed description...",
+  "todo_list.created_time": "Created: %s",
+  "todo_list.instructions": "Check boxes to mark complete, click edit button to modify items"
+}

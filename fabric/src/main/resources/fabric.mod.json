@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "todo_list",
+  "version": "${version}",
+  "name": "Todo List",
+  "description": "A simple to-do list system that is highly integrated with Minecraft",
+  "authors": [
+    "ENC_Euphony"
+  ],
+  "contact": {
+    "homepage": ""
+  },
+  "license": "GPL-3.0",
+  "icon": "assets/todo_list/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.euphony.todo_list.fabric.TodoListFabric"
+    ],
+    "client": [
+      "com.euphony.todo_list.fabric.client.TodoListFabricClient"
+    ]
+  },
+  "mixins": [
+    "todo_list.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.14",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "another-mod": "*"
+  }
+}

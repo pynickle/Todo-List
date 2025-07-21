@@ -1,0 +1,22 @@
+{
+  "category.todo_list.keymapping": "待办清单",
+  "key.todo_list.open_todo_list": "打开待办清单",
+  "todo_list.title": "待办清单",
+  "todo_list.add_title": "添加待办事项",
+  "todo_list.edit_title": "编辑待办事项",
+  "todo_list.add_button": "添加",
+  "todo_list.save_button": "保存",
+  "todo_list.edit": "编辑",
+  "todo_list.delete": "删除",
+  "todo_list.pin": "固定",
+  "todo_list.unpin": "取消固定",
+  "todo_list.overlay_title": "待办清单",
+  "todo_list.overlay_empty": "暂无待办事项",
+  "todo_list.add_item": "描述",
+  "todo_list.title_hint": "请输入标题...",
+  "todo_list.title_label": "标题",
+  "todo_list.description_label": "描述",
+  "todo_list.description_hint": "请输入详细描述...",
+  "todo_list.created_time": "创建时间：%s",
+  "todo_list.instructions": "勾选复选框标记完成，点击编辑按钮修改项目"
+}
