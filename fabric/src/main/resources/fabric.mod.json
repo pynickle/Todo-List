@@ -11,7 +11,7 @@
     "homepage": ""
   },
   "license": "GPL-3.0",
-  "icon": "assets/todo_list/icon.png",
+  "icon": "logo.png",
   "environment": "*",
   "entrypoints": {
     "main": [

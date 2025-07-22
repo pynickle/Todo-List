@@ -1,5 +1,6 @@
 modLoader = "javafml"
 loaderVersion = "[2,)"
+logoFile = "logo.png"
 #issueTrackerURL = ""
 license = "GNU GPL 3.0"
 
