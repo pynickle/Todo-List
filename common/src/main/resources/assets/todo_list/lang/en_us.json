@@ -18,5 +18,16 @@
   "todo_list.description_label": "Description",
   "todo_list.description_hint": "Enter detailed description...",
   "todo_list.created_time": "Created: %s",
-  "todo_list.instructions": "Check boxes to mark complete, click edit button to modify items"
+  "todo_list.instructions": "Check boxes to mark complete, click edit button to modify items",
+  "todo_list.tags": "Tags",
+  "todo_list.new_tag": "New Tag",
+  "todo_list.search_tags": "Search Tags",
+  "todo_list.selected_tags": "Selected %d tags",
+  "todo_list.tag_selection_panel": "Tag Selection Panel",
+  "todo_list.tags_count": "%d tags",
+  "todo_list.search": "Search",
+  "todo_list.search_hint": "Search todo items...",
+  "todo_list.clear": "Clear",
+  "todo_list.search_results": "Found %d items out of %d",
+  "todo_list.filtered_by_tags": "Filtered by %d tags"
 }

@@ -1,24 +1,29 @@
 package com.euphony.todo_list.client.screen;
 
+import com.euphony.todo_list.client.components.TagSelectionPanel;
+import com.euphony.todo_list.todo.Tag;
 import com.euphony.todo_list.todo.TodoItem;
 import com.euphony.todo_list.todo.TodoListManager;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.MultiLineEditBox;
-import net.minecraft.client.gui.components.StringWidget;
+import net.minecraft.client.gui.components.*;
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+
+import static com.euphony.todo_list.TodoList.LOGGER;
 
 public class TodoAddScreen extends Screen {
     private final HeaderAndFooterLayout layout = new HeaderAndFooterLayout(this);
 
     EditBox titleEditBox;
     MultiLineEditBox descriptionEditBox;
+    TagSelectionPanel tagSelectionPanel;
+    private List<Tag> selectedTags = new ArrayList<>();
 
     // 编辑模式相关字段
     private final boolean isEditMode;
@@ -31,39 +36,56 @@ public class TodoAddScreen extends Screen {
         this.isEditMode = todoItem != null;
         this.editingItemId = todoItem != null ? todoItem.getId() : null;
         this.parentScreen = parentScreen;
+
+        // 如果是编辑模式，预设标签
+        if (isEditMode) {
+            this.selectedTags = new ArrayList<>(todoItem.getTags());
+        }
     }
 
     @Override
     protected void init() {
         super.init();
 
-        // 界面布局参数
-        int centerX = this.width / 2;
+        // 界面布局参数 - 调整为左侧标签面板和右侧主表单
+        int panelWidth = 120; // 标签面板宽度
+        int formWidth = 240;
+        int spacing = 20;
+        int leftMargin = 10;
+        int centerX = leftMargin + panelWidth + spacing + formWidth / 2;
         int centerY = this.height / 2;
-        int formWidth = 280;
-        int leftMargin = centerX - formWidth / 2;
+
+        // 创建标签选择面板
+        tagSelectionPanel = new TagSelectionPanel(
+            leftMargin, centerY - 100, panelWidth, 200,
+            this, selectedTags,
+            (tags) -> this.selectedTags = new ArrayList<>(tags)
+        );
+        addRenderableWidget(tagSelectionPanel);
+
 
         // 标题区域 - 向上移动，给标题留出更多空间
-        int titleAreaY = centerY - 110;  // 比原来更高
+        int titleAreaY = centerY - 110;
 
         // 主标题 - 作为 StringWidget 添加到界面中
         Component screenTitle = isEditMode ?
             Component.translatable("todo_list.edit_title") :
             Component.translatable("todo_list.add_title");
         StringWidget mainTitle = new StringWidget(
-            leftMargin, titleAreaY, formWidth, 16,
+            leftMargin + panelWidth + spacing, titleAreaY, formWidth, 16,
             screenTitle, this.font
         );
         mainTitle.setColor(0xFFFFFF);
-        mainTitle.alignCenter();  // 居中对齐
+        mainTitle.alignCenter();
         addRenderableWidget(mainTitle);
 
         // 输入框区域 - 稍微向下调整
         int titleFieldY = centerY - 70;
+        int formX = leftMargin + panelWidth + spacing;
 
         // 标题输入框标签
         StringWidget titleLabel = new StringWidget(
-            leftMargin, titleFieldY - 15, formWidth, 12,
+            formX, titleFieldY - 15, formWidth, 12,
             Component.translatable("todo_list.title_label"),
             this.font
         );
@@ -73,7 +95,7 @@ public class TodoAddScreen extends Screen {
         // 标题输入框
         titleEditBox = addRenderableWidget(new EditBox(
                 this.font,
-                leftMargin,
+                formX,
                 titleFieldY,
                 formWidth,
                 22,
@@ -86,7 +108,7 @@ public class TodoAddScreen extends Screen {
 
         // 描述输入框标签
         StringWidget descLabel = new StringWidget(
-            leftMargin, descY - 15, formWidth, 12,
+            formX, descY - 15, formWidth, 12,
             Component.translatable("todo_list.description_label"),
             this.font
         );
@@ -96,7 +118,7 @@ public class TodoAddScreen extends Screen {
         // 描述输入框
         descriptionEditBox = addRenderableWidget(new MultiLineEditBox(
                 this.font,
-                leftMargin,
+                formX,
                 descY,
                 formWidth,
                 80,
@@ -110,6 +132,12 @@ public class TodoAddScreen extends Screen {
             if (item != null) {
                 titleEditBox.setValue(item.getTitle());
                 descriptionEditBox.setValue(item.getDescription());
+                selectedTags = new ArrayList<>(item.getTags());
+
+                // 设置初始化标志，防止无限递归
+                tagSelectionPanel.setInitializing(true);
+                tagSelectionPanel.setSelectedTags(selectedTags);
+                tagSelectionPanel.setInitializing(false);
 
                 // 添加创建时间显示（仅在编辑模式下）
                 String createdTimeText = item.getCreatedAt().format(
@@ -119,12 +147,12 @@ public class TodoAddScreen extends Screen {
 
                 // 创建时间标签
                 StringWidget createdTimeLabel = new StringWidget(
-                    leftMargin, descY + 90, formWidth, 12,
+                    formX, descY + 90, formWidth, 12,
                     createdTimeComponent,
                     this.font
                 );
-                createdTimeLabel.setColor(0xAAAAAA); // 使用较淡的颜色
-                createdTimeLabel.alignCenter(); // 居中显示
+                createdTimeLabel.setColor(0xAAAAAA);
+                createdTimeLabel.alignCenter();
                 addRenderableWidget(createdTimeLabel);
             }
         }
@@ -147,17 +175,18 @@ public class TodoAddScreen extends Screen {
                     if (!title.isEmpty()) {
                         if (isEditMode && editingItemId != null) {
                             // 更新现有项目
-                            TodoListManager.getInstance().updateTodoItem(editingItemId, title, description);
+                            TodoListManager.getInstance().updateTodoItem(editingItemId, title, description, selectedTags);
                         } else {
                             // 添加新项目
                             TodoItem todoItem = new TodoItem(title, description);
+                            todoItem.setTags(selectedTags);
                             TodoListManager.getInstance().addTodoItem(todoItem);
                         }
                         this.onClose();
                     }
                 }
         ).pos(centerX - buttonWidth - buttonSpacing / 2, buttonY)
-                .size(buttonWidth, 24)  // 稍微高一点的按钮
+                .size(buttonWidth, 24)
                 .build();
         addRenderableWidget(primaryButton);
 
@@ -170,8 +199,56 @@ public class TodoAddScreen extends Screen {
                 .build();
         addRenderableWidget(cancelButton);
 
+        List<AbstractWidget> abstractWidgets = tagSelectionPanel.createChildComponents();
+        for (AbstractWidget abstractWidget : abstractWidgets) {
+            addRenderableWidget(abstractWidget);
+        }
+
         // 设置默认焦点到标题输入框
         this.setInitialFocus(titleEditBox);
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // 先让标签面板处理鼠标点击
+        if (tagSelectionPanel != null && tagSelectionPanel.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+
+        // 调试信息
+        if (this.getFocused() != null) {
+            LOGGER.info("Current focused: " + this.getFocused().toString());
+        }
+
+        boolean result = super.mouseClicked(mouseX, mouseY, button);
+        LOGGER.info("Mouse click result: " + result);
+        return result;
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        // 先让标签面板处理按键事件
+        if (tagSelectionPanel != null && tagSelectionPanel.handleKeyPress(keyCode, scanCode, modifiers)) {
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public boolean charTyped(char codePoint, int modifiers) {
+        // 先让标签面板处理字符输入事件
+        /*
+        if (tagSelectionPanel != null) {
+            if (tagSelectionPanel.charTyped(codePoint, modifiers)) {
+                return true;
+            }
+            if (tagSelectionPanel.charTyped(codePoint, modifiers)) {
+                return true;
+            }
+        }
+
+         */
+        return super.charTyped(codePoint, modifiers);
     }
 
     @Override
@@ -188,47 +265,18 @@ public class TodoAddScreen extends Screen {
         super.render(guiGraphics, mouseX, mouseY, partialTick);
 
         // 绘制界面背景装饰
-        int centerX = this.width / 2;
+        int formWidth = 240;
+        int panelWidth = 120; // 标签面板宽度
+        int spacing = 20;
+        int leftMargin = 10;
         int centerY = this.height / 2;
-        int formWidth = 280;
-        int formHeight = 220;  // 稍微增加高度以容纳标题
-        int leftMargin = centerX - formWidth / 2;
-        int topMargin = centerY - formHeight / 2;
-
-        // 绘制表单背景框 - 扩展到包含标题区域
-        guiGraphics.fill(
-            leftMargin - 20, topMargin - 30,  // 向上扩展
-            leftMargin + formWidth + 20, topMargin + formHeight + 20,
-            0x40000000
-        );
-
-        // 绘制表单边框
-        guiGraphics.fill(
-            leftMargin - 21, topMargin - 31,
-            leftMargin + formWidth + 21, topMargin - 30,
-            0x80FFFFFF  // 上边框
-        );
-        guiGraphics.fill(
-            leftMargin - 21, topMargin + formHeight + 20,
-            leftMargin + formWidth + 21, topMargin + formHeight + 21,
-            0x80FFFFFF  // 下边框
-        );
-        guiGraphics.fill(
-            leftMargin - 21, topMargin - 30,
-            leftMargin - 20, topMargin + formHeight + 20,
-            0x80FFFFFF  // 左边框
-        );
-        guiGraphics.fill(
-            leftMargin + formWidth + 20, topMargin - 30,
-            leftMargin + formWidth + 21, topMargin + formHeight + 20,
-            0x80FFFFFF  // 右边框
-        );
+        int formX = leftMargin + panelWidth + spacing;
 
         // 绘制标题下方的分隔线
         int separatorY = centerY - 95;
         guiGraphics.fill(
-            leftMargin, separatorY,
-            leftMargin + formWidth, separatorY + 1,
+            formX, separatorY,
+            formX + formWidth, separatorY + 1,
             0x80FFFFFF
         );
     }

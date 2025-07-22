@@ -1,6 +1,9 @@
 package com.euphony.todo_list.client.screen;
 
+import com.euphony.todo_list.TodoList;
+import com.euphony.todo_list.client.components.TagDisplayWidget;
 import com.euphony.todo_list.client.overlay.TodoOverlay;
+import com.euphony.todo_list.todo.Tag;
 import com.euphony.todo_list.todo.TodoItem;
 import com.euphony.todo_list.todo.TodoListManager;
 import com.euphony.todo_list.utils.Utils;
@@ -11,6 +14,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class TodoListViewScreen extends Screen {
@@ -18,6 +22,11 @@ public class TodoListViewScreen extends Screen {
 
     private int scrollOff;
     private final Screen parentScreen;
+    private EditBox searchBox;
+    private List<Tag> filterTags = new ArrayList<>();
+    private List<TodoItem> filteredTodoItems = new ArrayList<>();
+    private final int maxVisibleTodos = 4; // 最多显示4个todo
+    private boolean isDragging = false; // 添加拖拽状态\
 
     public TodoListViewScreen(Screen parentScreen) {
         super(Component.translatable("todo_list.title"));
@@ -29,6 +38,33 @@ public class TodoListViewScreen extends Screen {
         super.init();
         int i = this.width / 2;
         int j = this.height / 2;
+
+        // 搜索框
+        searchBox = new EditBox(this.font, i - 120, 40, 200, 20, Component.translatable("todo_list.search"));
+        searchBox.setHint(Component.translatable("todo_list.search_hint"));
+        addRenderableWidget(searchBox);
+
+        // 搜索按钮
+        Button searchButton = Button.builder(
+            Component.translatable("todo_list.search"),
+            button -> refreshTodoList()
+        ).pos(i + 85, 40)
+        .size(50, 20)
+        .build();
+        addRenderableWidget(searchButton);
+
+        // 清除搜索按钮
+        Button clearButton = Button.builder(
+            Component.translatable("todo_list.clear"),
+            button -> {
+                searchBox.setValue("");
+                filterTags.clear();
+                refreshTodoList();
+            }
+        ).pos(i + 140, 40)
+        .size(40, 20)
+        .build();
+        addRenderableWidget(clearButton);
 
         this.addRenderableWidget(new ImageButton(this.width - 30, 8, 18, 18,
                 ADD_SPRITES,
@@ -53,83 +89,129 @@ public class TodoListViewScreen extends Screen {
         .build();
 
         this.addRenderableWidget(pinButton);
+        String searchText = searchBox != null ? searchBox.getValue() : "";
+        filteredTodoItems = TodoListManager.getInstance().getFilteredTodoItems(filterTags, searchText);
 
-        TodoListManager todoListManager = TodoListManager.getInstance();
-        List<TodoItem> todoItems = todoListManager.getAllTodoItems();
+        TodoList.LOGGER.info("init");
+        TodoList.LOGGER.info(String.valueOf(this.scrollOff));
+        List<AbstractWidget> widgets = renderTodoItems(this.height / 2);
+        for(AbstractWidget widget : widgets) {
+            addRenderableWidget(widget);
+        }
+    }
+
+    private void refreshTodoList() {
+        String searchText = searchBox != null ? searchBox.getValue() : "";
+        filteredTodoItems = TodoListManager.getInstance().getFilteredTodoItems(filterTags, searchText);
+        this.clearWidgets();
+        TodoList.LOGGER.info("refresh");
+        this.init();
+        TodoList.LOGGER.info(this.children().toString());
+    }
+
+    private List<AbstractWidget> renderTodoItems(int centerY) {
+        List<AbstractWidget> widgets = new ArrayList<>();
 
         int displayIndex = 0;
-        for(int itemIndex = 0; itemIndex < todoItems.size(); itemIndex++) {
-            TodoItem todoItem = todoItems.get(itemIndex);
+        for(int itemIndex = 0; itemIndex < filteredTodoItems.size(); itemIndex++) {
+            TodoItem todoItem = filteredTodoItems.get(itemIndex);
 
             // 只显示在当前滚动范围内的项目
-            if (!this.canScroll(todoItems.size()) || (itemIndex >= this.scrollOff && itemIndex < 7 + this.scrollOff)) {
-                int yPos = j - 80 + displayIndex * 25;
+            if (!this.canScroll(filteredTodoItems.size()) || (itemIndex >= this.scrollOff && itemIndex < maxVisibleTodos + this.scrollOff)) {
+                int yPos = centerY - 50 + displayIndex * 35; // 增加行高以容纳标签
 
-                // 复选框
-                Checkbox checkbox = Checkbox.builder(
-                        Component.empty(),
-                        this.font
-                ).pos(i - 120, yPos)
-                .selected(todoItem.isCompleted())
-                .onValueChange((cb, selected) -> {
-                    todoListManager.toggleCompleted(todoItem.getId());
-                    this.rebuildWidgets(); // 重新构建界面以刷新显示
-                })
-                .build();
+                // 根据是否有标签来调整布局
+                boolean hasTags = !todoItem.getTags().isEmpty();
 
-                addRenderableWidget(checkbox);
+                if (hasTags) {
+                    // 待办事项标题 - 保持在顶部
+                    String titleText = todoItem.getTitle();
+                    int availableWidth = 150;
 
-                // 待办事项标题 - 如果已完成则显示删除线效果，并确保文本不会溢出
-                String titleText = todoItem.getTitle();
-
-                // 计算可用宽度：从复选框右侧到编辑按钮左侧
-                int availableWidth = 150; // 可调整的文本显示区域宽度
-
-                // 截断过长的文本
-                if (this.font.width(titleText) > availableWidth) {
-                    // 逐字符减少直到文本适合宽度（包括省略号的宽度）
-                    String ellipsis = "...";
-                    int ellipsisWidth = this.font.width(ellipsis);
-
-                    while (this.font.width(titleText) + ellipsisWidth > availableWidth && titleText.length() > 0) {
-                        titleText = titleText.substring(0, titleText.length() - 1);
+                    // 截断过长的文本
+                    if (this.font.width(titleText) > availableWidth) {
+                        String ellipsis = "...";
+                        int ellipsisWidth = this.font.width(ellipsis);
+                        while (this.font.width(titleText) + ellipsisWidth > availableWidth && !titleText.isEmpty()) {
+                            titleText = titleText.substring(0, titleText.length() - 1);
+                        }
+                        titleText += ellipsis;
                     }
-                    titleText += ellipsis;
+
+                    Component titleComponent = todoItem.isCompleted() ?
+                        Component.literal("§m" + titleText) :
+                        Component.literal(titleText);
+
+                    StringWidget titleWidget = new StringWidget(this.width / 2 - 90, yPos + 2, availableWidth, 12, titleComponent, this.font);
+                    widgets.add(titleWidget);
+
+                    // 标签显示 - 在标题下方
+                    TagDisplayWidget tagDisplay = new TagDisplayWidget(
+                        this.width / 2 - 90, yPos + 14,
+                        150, 12,
+                        todoItem.getTags()
+                    );
+                    widgets.add(tagDisplay);
+                } else {
+                    // 待办事项标题 - 单行居中
+                    String titleText = todoItem.getTitle();
+                    int availableWidth = 150; // 没有标签时可以用更多宽度
+
+                    // 截断过长的文本
+                    if (this.font.width(titleText) > availableWidth) {
+                        String ellipsis = "...";
+                        int ellipsisWidth = this.font.width(ellipsis);
+                        while (this.font.width(titleText) + ellipsisWidth > availableWidth && titleText.length() > 0) {
+                            titleText = titleText.substring(0, titleText.length() - 1);
+                        }
+                        titleText += ellipsis;
+                    }
+
+                    Component titleComponent = todoItem.isCompleted() ?
+                        Component.literal("§m" + titleText) :
+                        Component.literal(titleText);
+
+                    StringWidget titleWidget = new StringWidget(this.width / 2 - 90, yPos + 5, availableWidth, 12, titleComponent, this.font);
+                    widgets.add(titleWidget);
                 }
-
-                Component titleComponent = todoItem.isCompleted() ?
-                    Component.literal("§m" + titleText) :
-                    Component.literal(titleText);
-
-                StringWidget titleWidget = new StringWidget(i - 90, yPos + 5, availableWidth, 12, titleComponent, this.font);
-                addRenderableWidget(titleWidget);
-
-                // 编辑按钮
+                // 没有标签的情况：使用原始布局，所有元素在同一水平线
+                // 复选框 - 保持原始位置
+                Checkbox checkbox = Checkbox.builder(
+                                Component.empty(),
+                                this.font
+                        ).pos(this.width / 2 - 120, yPos + 5) // 使用原始的垂直对齐
+                        .selected(todoItem.isCompleted())
+                        .onValueChange((cb, selected) -> {
+                            TodoListManager.getInstance().toggleCompleted(todoItem.getId());
+                            refreshTodoList();
+                        })
+                        .build();
+                widgets.add(checkbox);
+                // 编辑按钮 - 与文字对齐
                 Button editBtn = Button.builder(
-                    Component.translatable("todo_list.edit"),
-                    button -> Minecraft.getInstance().setScreen(new TodoAddScreen(todoItem, this))
-                ).pos(i + 70, yPos)
-                .size(35, 20)
-                .build();
+                                Component.translatable("todo_list.edit"),
+                                button -> Minecraft.getInstance().setScreen(new TodoAddScreen(todoItem, this))
+                        ).pos(this.width / 2 + 70, yPos)
+                        .size(35, 20)
+                        .build();
+                widgets.add(editBtn);
 
-                addRenderableWidget(editBtn);
-
-                // 删除按钮
+                // 删除按钮 - 与文字对齐
                 Button deleteBtn = Button.builder(
-                    Component.translatable("todo_list.delete"),
-                    button -> {
-                        todoListManager.removeTodoItem(todoItem.getId());
-                        this.rebuildWidgets(); // 重新构建界面以更新显示
-                    }
-                ).pos(i + 110, yPos)
-                .size(35, 20)
-                .build();
-
-                addRenderableWidget(deleteBtn);
+                                Component.translatable("todo_list.delete"),
+                                button -> {
+                                    TodoListManager.getInstance().removeTodoItem(todoItem.getId());
+                                    refreshTodoList();
+                                }
+                        ).pos(this.width / 2 + 110, yPos)
+                        .size(35, 20)
+                        .build();
+                widgets.add(deleteBtn);
 
                 displayIndex++;
             }
         }
+        return widgets;
     }
 
     @Override
@@ -139,10 +221,58 @@ public class TodoListViewScreen extends Screen {
         // 绘制标题
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 20, 0xFFFFFF);
 
+        // 绘制滚动条
+        if (filteredTodoItems.size() > maxVisibleTodos) {
+            renderScrollbar(guiGraphics);
+        }
+
+        // 绘制搜索结果信息
+        if (searchBox != null && !searchBox.getValue().isEmpty()) {
+            Component searchInfo = Component.translatable("todo_list.search_results",
+                filteredTodoItems.size(), TodoListManager.getInstance().getAllTodoItems().size());
+            guiGraphics.drawCenteredString(this.font, searchInfo, this.width / 2, 65, 0xAAAAAA);
+        }
+
+        // 绘制当前筛选标签（如果有）
+        if (!filterTags.isEmpty()) {
+            Component filterInfo = Component.translatable("todo_list.filtered_by_tags", filterTags.size());
+            guiGraphics.drawCenteredString(this.font, filterInfo, this.width / 2,
+                searchBox.getValue().isEmpty() ? 65 : 75, 0xAAAAAA);
+        }
+
         // 绘制说明文字
         guiGraphics.drawCenteredString(this.font,
             Component.translatable("todo_list.instructions"),
             this.width / 2, this.height - 30, 0xAAAAAA);
+    }
+
+    // 渲染滚动条
+    private void renderScrollbar(GuiGraphics guiGraphics) {
+        int centerY = this.height / 2;
+        int scrollbarX = this.width / 2 + 160; // 位置在todo列表右侧
+        int scrollbarY = centerY - 50; // 与todo列表对齐
+        int scrollbarHeight = maxVisibleTodos * 35; // 35是每个todo项的高度
+
+        // 滚动条背景
+        guiGraphics.fill(scrollbarX, scrollbarY, scrollbarX + 6, scrollbarY + scrollbarHeight, 0x40FFFFFF);
+
+        // 滚动条滑块 - 参考村民界面的实现
+        int totalTodos = filteredTodoItems.size();
+        if (totalTodos > maxVisibleTodos) {
+            // 计算滑块高度和位置
+            int maxScroll = totalTodos - maxVisibleTodos;
+            int scrollAreaHeight = scrollbarHeight - 27; // 减去滑块高度
+            int thumbHeight = 27; // 固定滑块高度
+
+            // 计算滑块位置
+            int thumbY;
+            thumbY = scrollbarY + (scrollAreaHeight * scrollOff / maxScroll);
+
+            // 确保滑块不超出边界
+            thumbY = Math.min(thumbY, scrollbarY + scrollbarHeight - thumbHeight);
+
+            guiGraphics.fill(scrollbarX + 1, thumbY, scrollbarX + 5, thumbY + thumbHeight, 0x80FFFFFF);
+        }
     }
 
     @Override
@@ -150,27 +280,64 @@ public class TodoListViewScreen extends Screen {
         if (super.mouseScrolled(mouseX, mouseY, scrollX, scrollY)) {
             return true;
         } else {
-            int i = TodoListManager.getInstance().getAllTodoItems().size();
-            if (this.canScroll(i)) {
-                int j = i - 7;
-                this.scrollOff = Mth.clamp((int)(this.scrollOff - scrollY), 0, j);
-                this.rebuildWidgets(); // 重新构建界面以更新滚动位置
+            int totalTodos = filteredTodoItems.size();
+            if (this.canScroll(totalTodos)) {
+                int maxScroll = totalTodos - maxVisibleTodos;
+                this.scrollOff = Mth.clamp((int)(this.scrollOff - scrollY), 0, maxScroll);
+                refreshTodoList();
             }
-
             return true;
         }
     }
 
     @Override
-    public void onClose() {
-        if (parentScreen != null) {
-            this.minecraft.setScreen(parentScreen);
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (isDragging) {
+            int centerY = this.height / 2;
+            int scrollbarY = centerY - 50;
+            int scrollbarHeight = maxVisibleTodos * 35;
+            int totalTodos = filteredTodoItems.size();
+            int maxScroll = totalTodos - maxVisibleTodos;
+
+            // 计算滚动位置，参考村民界面的实现
+            float scrollRatio = ((float)mouseY - scrollbarY - 13.5F) / (scrollbarHeight - 27.0F);
+            scrollRatio = scrollRatio * maxScroll + 0.5F;
+            int newScrollOff = Mth.clamp((int)scrollRatio, 0, maxScroll);
+
+            // 只有当滚动位置真的改变时才刷新
+            if (newScrollOff != scrollOff) {
+                scrollOff = newScrollOff;
+                this.rebuildWidgets();
+            }
+            return true;
         } else {
-            super.onClose();
+            return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
         }
     }
 
-    private boolean canScroll(int numOffers) {
-        return numOffers > 7;
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // 重置拖拽状态
+        isDragging = false;
+
+        // 检查是否点击在滚动条上
+        if (filteredTodoItems.size() > maxVisibleTodos) {
+            int centerY = this.height / 2;
+            int scrollbarX = this.width / 2 + 160;
+            int scrollbarY = centerY - 50;
+            int scrollbarHeight = maxVisibleTodos * 35;
+
+            if (mouseX > scrollbarX && mouseX < scrollbarX + 6 &&
+                mouseY > scrollbarY && mouseY <= scrollbarY + scrollbarHeight + 1) {
+                isDragging = true;
+                return true;
+            }
+        }
+
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private boolean canScroll(int numTodos) {
+        return numTodos > maxVisibleTodos;
     }
 }

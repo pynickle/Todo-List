@@ -32,7 +32,7 @@ public class TodoListNeoForgeClient {
     public static void onKeyPressed(ScreenEvent.KeyReleased.Post event) {
         if(!TodoKeyMappings.OPEN_TODO_LIST.matches(event.getKeyCode(), event.getScanCode())) return;
 
-        OpenTodoListEvent.openTodoList(Minecraft.getInstance());
+        OpenTodoListEvent.handleKeyRelease(Minecraft.getInstance());
     }
 
     // 渲染悬浮窗

@@ -18,5 +18,16 @@
   "todo_list.description_label": "描述",
   "todo_list.description_hint": "请输入详细描述...",
   "todo_list.created_time": "创建时间：%s",
-  "todo_list.instructions": "勾选复选框标记完成，点击编辑按钮修改项目"
+  "todo_list.instructions": "勾选复选框标记完成，点击编辑按钮修改项目",
+  "todo_list.tags": "标签",
+  "todo_list.new_tag": "新建标签",
+  "todo_list.search_tags": "搜索标签",
+  "todo_list.selected_tags": "已选择 %d 个标签",
+  "todo_list.tag_selection_panel": "标签选择面板",
+  "todo_list.tags_count": "%d 个标签",
+  "todo_list.search": "搜索",
+  "todo_list.search_hint": "搜索待办事项...",
+  "todo_list.clear": "清除",
+  "todo_list.search_results": "找到 %d 项，共 %d 项",
+  "todo_list.filtered_by_tags": "按 %d 个标签筛选"
 }

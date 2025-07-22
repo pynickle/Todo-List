@@ -19,6 +19,12 @@ public class OpenTodoListEvent {
             return;
         }
 
+        // 如果不在游戏世界中（单人或多人），不处理按键事件
+        if (minecraft.level == null) {
+            wasKeyPressed = isKeyPressed;
+            return;
+        }
+
         // 检查是否有输入框正在被使用（额外的安全检查）
         if (minecraft.screen != null && isInputFieldFocused(minecraft)) {
             wasKeyPressed = isKeyPressed;
@@ -30,6 +36,25 @@ public class OpenTodoListEvent {
         }
 
         wasKeyPressed = isKeyPressed;
+    }
+
+    public static void handleKeyRelease(Minecraft minecraft) {
+        // 如果当前已经在待办清单相关界面，不处理按键事件
+        if (minecraft.screen instanceof TodoListViewScreen || minecraft.screen instanceof TodoAddScreen) {
+            return;
+        }
+
+        // 如果不在游戏世界中（单人或多人），不处理按键事件
+        if (minecraft.level == null) {
+            return;
+        }
+
+        // 检查是否有输入框正在被使用（额外的安全检查）
+        if (minecraft.screen != null && isInputFieldFocused(minecraft)) {
+            return;
+        }
+
+        openTodoList(minecraft);
     }
 
     /**

@@ -5,6 +5,7 @@ import com.euphony.todo_list.data.TodoDataManager;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class TodoListManager {
     private static TodoListManager instance;
@@ -74,11 +75,72 @@ public class TodoListManager {
         }
     }
 
+    public void updateTodoItem(UUID id, String title, String description, List<Tag> tags) {
+        TodoItem item = getTodoItem(id);
+        if (item != null) {
+            item.setTitle(title);
+            item.setDescription(description);
+            item.setTags(tags);
+            saveToFile(); // 自动保存
+        }
+    }
+
     public void toggleCompleted(UUID id) {
         TodoItem item = getTodoItem(id);
         if (item != null) {
             item.setCompleted(!item.isCompleted());
             saveToFile(); // 自动保存
         }
+    }
+
+    // 新增：根据标签筛选待办事项
+    public List<TodoItem> getFilteredTodoItems(List<Tag> filterTags, String searchText) {
+        return todoItems.stream()
+                .filter(item -> {
+                    // 如果有标签筛选，检查是否包含任一筛选标签
+                    if (filterTags != null && !filterTags.isEmpty()) {
+                        boolean hasAnyTag = false;
+                        for (Tag filterTag : filterTags) {
+                            if (item.hasTag(filterTag)) {
+                                hasAnyTag = true;
+                                break;
+                            }
+                        }
+                        if (!hasAnyTag) return false;
+                    }
+
+                    // 如果有搜索文本，检查标题或描述是否包含搜索文本
+                    if (searchText != null && !searchText.trim().isEmpty()) {
+                        String search = searchText.toLowerCase().trim();
+                        return item.getTitle().toLowerCase().contains(search) ||
+                               item.getDescription().toLowerCase().contains(search);
+                    }
+
+                    return true;
+                })
+                .collect(Collectors.toList());
+    }
+
+    // 新增：根据单个标签筛选待办事项
+    public List<TodoItem> getTodoItemsByTag(Tag tag) {
+        return todoItems.stream()
+                .filter(item -> item.hasTag(tag))
+                .collect(Collectors.toList());
+    }
+
+    // 新增：搜索待办事项
+    public List<TodoItem> searchTodoItems(String searchText) {
+        if (searchText == null || searchText.trim().isEmpty()) {
+            return getAllTodoItems();
+        }
+
+        String search = searchText.toLowerCase().trim();
+        return todoItems.stream()
+                .filter(item ->
+                    item.getTitle().toLowerCase().contains(search) ||
+                    item.getDescription().toLowerCase().contains(search) ||
+                    item.getTags().stream().anyMatch(tag -> tag.getName().toLowerCase().contains(search))
+                )
+                .collect(Collectors.toList());
     }
 }

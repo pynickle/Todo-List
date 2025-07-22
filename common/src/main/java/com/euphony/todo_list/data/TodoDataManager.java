@@ -1,5 +1,7 @@
 package com.euphony.todo_list.data;
 
+import com.euphony.todo_list.todo.Tag;
+import com.euphony.todo_list.todo.TagManager;
 import com.euphony.todo_list.todo.TodoItem;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -15,9 +17,9 @@ import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+
+import static com.mojang.text2speech.Narrator.LOGGER;
 
 /**
  * 待办清单数据持久化管理器
@@ -26,6 +28,7 @@ import java.util.List;
 public class TodoDataManager {
     private static final String TODO_FOLDER = "todolist";
     private static final String TODO_FILE = "todos.json";
+    private static final String TAGS_FILE = "tags.json";
     private static final Gson GSON = new GsonBuilder()
             .setPrettyPrinting()
             .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter())
@@ -34,7 +37,7 @@ public class TodoDataManager {
     /**
      * 获取当前世界的待办清单存储路径
      */
-    private static Path getTodoFilePath() {
+    private static Path getTodoDirectory() {
         Minecraft minecraft = Minecraft.getInstance();
         Path gameDir = minecraft.gameDirectory.toPath();
 
@@ -44,7 +47,7 @@ public class TodoDataManager {
             worldName = "global"; // 如果不在世界中，使用全局存储
         }
 
-        // 创建路径：gameDir/todolist/worldName/todos.json
+        // 创建路径：gameDir/todolist/worldName/
         Path todoDir = gameDir.resolve(TODO_FOLDER).resolve(worldName);
 
         // 确保目录存在
@@ -54,7 +57,15 @@ public class TodoDataManager {
             System.err.println("Failed to create todo directory: " + e.getMessage());
         }
 
-        return todoDir.resolve(TODO_FILE);
+        return todoDir;
+    }
+
+    private static Path getTodoFilePath() {
+        return getTodoDirectory().resolve(TODO_FILE);
+    }
+
+    private static Path getTagsFilePath() {
+        return getTodoDirectory().resolve(TAGS_FILE);
     }
 
     /**
@@ -64,16 +75,12 @@ public class TodoDataManager {
         Minecraft minecraft = Minecraft.getInstance();
 
         // 检查是否在单人世界
-        if (minecraft.level != null && minecraft.hasSingleplayerServer()) {
+        if (minecraft.hasSingleplayerServer()) {
             IntegratedServer server = minecraft.getSingleplayerServer();
             if (server != null) {
                 // 使用世界存储路径来获取真正的文件夹名字
-                String name = server.getWorldPath(LevelResource.ROOT).getParent().getFileName().toString();
                 // 备用方案：使用 levelName（这是文件夹名字，不是显示名称）
-                if(name != null) {
-                    return name;
-                }
-                return server.getWorldData().getLevelSettings().levelName();
+                return server.getWorldPath(LevelResource.ROOT).getParent().getFileName().toString();
             }
         }
 
@@ -87,9 +94,15 @@ public class TodoDataManager {
     }
 
     /**
-     * 保存待办清单到文件
+     * 保存待办清单和标签到文件
      */
     public static boolean saveTodos(List<TodoItem> todos) {
+        boolean todosSuccess = saveTodosToFile(todos);
+        boolean tagsSuccess = saveTagsToFile();
+        return todosSuccess && tagsSuccess;
+    }
+
+    private static boolean saveTodosToFile(List<TodoItem> todos) {
         Path filePath = getTodoFilePath();
 
         try {
@@ -104,7 +117,7 @@ public class TodoDataManager {
                 GSON.toJson(todoDataList, writer);
             }
 
-            System.out.println("Successfully saved " + todos.size() + " todos to: " + filePath);
+            LOGGER.info("Successfully saved " + todos.size() + " todos to: " + filePath);
             return true;
 
         } catch (IOException e) {
@@ -113,19 +126,50 @@ public class TodoDataManager {
         }
     }
 
+    private static boolean saveTagsToFile() {
+        Path filePath = getTagsFilePath();
+
+        try {
+            Map<UUID, Tag> tagsMap = TagManager.getInstance().getTagsMap();
+            List<TagData> tagDataList = new ArrayList<>();
+
+            for (Tag tag : tagsMap.values()) {
+                tagDataList.add(new TagData(tag));
+            }
+
+            try (FileWriter writer = new FileWriter(filePath.toFile())) {
+                GSON.toJson(tagDataList, writer);
+            }
+
+            LOGGER.info("Successfully saved " + tagDataList.size() + " tags to: " + filePath);
+            return true;
+
+        } catch (IOException e) {
+            System.err.println("Failed to save tags: " + e.getMessage());
+            return false;
+        }
+    }
+
     /**
-     * 从文件加载待办清单
+     * 从文件加载待办清单和标签
      */
     public static List<TodoItem> loadTodos() {
+        // 首先加载标签
+        loadTagsFromFile();
+
+        // 然后加载待办事项
+        return loadTodosFromFile();
+    }
+
+    private static List<TodoItem> loadTodosFromFile() {
         Path filePath = getTodoFilePath();
 
         if (!Files.exists(filePath)) {
-            System.out.println("Todo file not found, starting with empty list: " + filePath);
+            LOGGER.info("Todo file not found, starting with empty list: " + filePath);
             return new ArrayList<>();
         }
 
         try {
-            // 读取文件
             try (FileReader reader = new FileReader(filePath.toFile())) {
                 Type listType = new TypeToken<List<TodoData>>(){}.getType();
                 List<TodoData> todoDataList = GSON.fromJson(reader, listType);
@@ -140,13 +184,46 @@ public class TodoDataManager {
                     todos.add(data.toTodoItem());
                 }
 
-                System.out.println("Successfully loaded " + todos.size() + " todos from: " + filePath);
+                LOGGER.info("Successfully loaded " + todos.size() + " todos from: " + filePath);
                 return todos;
             }
 
         } catch (Exception e) {
             System.err.println("Failed to load todos: " + e.getMessage());
             return new ArrayList<>();
+        }
+    }
+
+    private static void loadTagsFromFile() {
+        Path filePath = getTagsFilePath();
+
+        if (!Files.exists(filePath)) {
+            LOGGER.info("Tags file not found, starting with empty tags: " + filePath);
+            return;
+        }
+
+        try {
+            try (FileReader reader = new FileReader(filePath.toFile())) {
+                Type listType = new TypeToken<List<TagData>>(){}.getType();
+                List<TagData> tagDataList = GSON.fromJson(reader, listType);
+
+                if (tagDataList == null) {
+                    return;
+                }
+
+                // 转换为 Tag 对象并添加到 TagManager
+                Map<UUID, Tag> tagsMap = new HashMap<>();
+                for (TagData data : tagDataList) {
+                    Tag tag = data.toTag();
+                    tagsMap.put(tag.getId(), tag);
+                }
+
+                TagManager.getInstance().setTagsFromMap(tagsMap);
+                LOGGER.info("Successfully loaded " + tagDataList.size() + " tags from: " + filePath);
+            }
+
+        } catch (Exception e) {
+            System.err.println("Failed to load tags: " + e.getMessage());
         }
     }
 
@@ -160,20 +237,27 @@ public class TodoDataManager {
         private boolean completed;
         private String createdAt;
         private String dueDate;
+        private List<String> tagIds; // 标签ID列表
 
         public TodoData(TodoItem item) {
             this.id = item.getId().toString();
             this.title = item.getTitle();
             this.description = item.getDescription();
             this.completed = item.isCompleted();
-            this.createdAt = item.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            this.createdAt = item.getCreatedAt().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME);
             this.dueDate = item.getDueDate() != null ?
-                item.getDueDate().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null;
+                item.getDueDate().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null;
+
+            // 保存标签ID
+            this.tagIds = new ArrayList<>();
+            for (Tag tag : item.getTags()) {
+                this.tagIds.add(tag.getId().toString());
+            }
         }
 
         public TodoItem toTodoItem() {
             TodoItem item = new TodoItem(title, description);
-            // 使用反射或其他方式设置私有字段
+            // 使用反射设置私有字段
             try {
                 var idField = TodoItem.class.getDeclaredField("id");
                 idField.setAccessible(true);
@@ -185,12 +269,30 @@ public class TodoDataManager {
 
                 var createdAtField = TodoItem.class.getDeclaredField("createdAt");
                 createdAtField.setAccessible(true);
-                createdAtField.set(item, LocalDateTime.parse(createdAt, DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                createdAtField.set(item, LocalDateTime.parse(createdAt, java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME));
 
                 if (dueDate != null) {
                     var dueDateField = TodoItem.class.getDeclaredField("dueDate");
                     dueDateField.setAccessible(true);
-                    dueDateField.set(item, LocalDateTime.parse(dueDate, DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                    dueDateField.set(item, LocalDateTime.parse(dueDate, java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                }
+
+                // 恢复标签
+                if (tagIds != null) {
+                    List<Tag> tags = new ArrayList<>();
+                    TagManager tagManager = TagManager.getInstance();
+                    for (String tagIdStr : tagIds) {
+                        try {
+                            UUID tagId = UUID.fromString(tagIdStr);
+                            Tag tag = tagManager.getTag(tagId);
+                            if (tag != null) {
+                                tags.add(tag);
+                            }
+                        } catch (IllegalArgumentException e) {
+                            System.err.println("Invalid tag ID: " + tagIdStr);
+                        }
+                    }
+                    item.setTags(tags);
                 }
 
             } catch (Exception e) {
@@ -198,6 +300,25 @@ public class TodoDataManager {
             }
 
             return item;
+        }
+    }
+
+    /**
+     * 用于JSON序列化的标签数据类
+     */
+    private static class TagData {
+        private String id;
+        private String name;
+        private int color;
+
+        public TagData(Tag tag) {
+            this.id = tag.getId().toString();
+            this.name = tag.getName();
+            this.color = tag.getColor();
+        }
+
+        public Tag toTag() {
+            return new Tag(UUID.fromString(id), name, color);
         }
     }
 }

@@ -9,9 +9,5 @@ public final class TodoListFabric implements ModInitializer {
     @Override
     public void onInitialize() {
         TodoList.init();
-        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
-            // 在客户端连接时加载待办事项
-            TodoListManager.getInstance().loadFromFile();
-        });
     }
 }
