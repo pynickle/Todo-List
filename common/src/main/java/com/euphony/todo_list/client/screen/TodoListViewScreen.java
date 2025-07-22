@@ -1,6 +1,5 @@
 package com.euphony.todo_list.client.screen;
 
-import com.euphony.todo_list.TodoList;
 import com.euphony.todo_list.client.components.TagDisplayWidget;
 import com.euphony.todo_list.client.overlay.TodoOverlay;
 import com.euphony.todo_list.todo.Tag;
@@ -92,8 +91,6 @@ public class TodoListViewScreen extends Screen {
         String searchText = searchBox != null ? searchBox.getValue() : "";
         filteredTodoItems = TodoListManager.getInstance().getFilteredTodoItems(filterTags, searchText);
 
-        TodoList.LOGGER.info("init");
-        TodoList.LOGGER.info(String.valueOf(this.scrollOff));
         List<AbstractWidget> widgets = renderTodoItems(this.height / 2);
         for(AbstractWidget widget : widgets) {
             addRenderableWidget(widget);
@@ -104,9 +101,7 @@ public class TodoListViewScreen extends Screen {
         String searchText = searchBox != null ? searchBox.getValue() : "";
         filteredTodoItems = TodoListManager.getInstance().getFilteredTodoItems(filterTags, searchText);
         this.clearWidgets();
-        TodoList.LOGGER.info("refresh");
         this.init();
-        TodoList.LOGGER.info(this.children().toString());
     }
 
     private List<AbstractWidget> renderTodoItems(int centerY) {

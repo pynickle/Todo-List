@@ -15,8 +15,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static com.euphony.todo_list.TodoList.LOGGER;
-
 public class TodoAddScreen extends Screen {
     private final HeaderAndFooterLayout layout = new HeaderAndFooterLayout(this);
 
@@ -215,13 +213,7 @@ public class TodoAddScreen extends Screen {
             return true;
         }
 
-        // 调试信息
-        if (this.getFocused() != null) {
-            LOGGER.info("Current focused: " + this.getFocused().toString());
-        }
-
         boolean result = super.mouseClicked(mouseX, mouseY, button);
-        LOGGER.info("Mouse click result: " + result);
         return result;
     }
 

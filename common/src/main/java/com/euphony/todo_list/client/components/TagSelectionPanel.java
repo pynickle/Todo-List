@@ -276,8 +276,6 @@ public class TagSelectionPanel extends AbstractWidget {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        LOGGER.info("TagSelectionPanel mouseClicked: x=" + mouseX + ", y=" + mouseY);
-
         // 重置拖拽状态
         isDragging = false;
 
