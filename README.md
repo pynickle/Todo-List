@@ -10,8 +10,6 @@
 - [ ] Automatic detection of task completion.
 - [ ] Integration with other mods.
 
-## Development
-
 This mod is actively being updated and more features will be added in the future!
 
 ## Version Support
