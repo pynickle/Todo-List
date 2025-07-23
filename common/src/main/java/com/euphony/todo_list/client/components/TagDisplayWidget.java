@@ -13,11 +13,16 @@ import java.util.List;
 
 public class TagDisplayWidget extends AbstractWidget {
     private final List<Tag> tags;
+    private final boolean leftAlign;
 
-    // 移除 maxDisplayTags 参数，改为动态计算
     public TagDisplayWidget(int x, int y, int width, int height, List<Tag> tags) {
+        this(x, y, width, height, tags, false); // 默认居中对齐
+    }
+
+    public TagDisplayWidget(int x, int y, int width, int height, List<Tag> tags, boolean leftAlign) {
         super(x, y, width, height, Component.empty());
         this.tags = tags;
+        this.leftAlign = leftAlign;
     }
 
     @Override
@@ -29,48 +34,69 @@ public class TagDisplayWidget extends AbstractWidget {
         Minecraft minecraft = Minecraft.getInstance();
         Font font = minecraft.font;
 
-        int currentX = getX();
-        int currentY = getY();
         int maxWidth = getWidth();
         int tagHeight = 12;
         int tagSpacing = 2;
-        int displayCount = 0;
 
-        // 预留空间给"更多"指示器
-        String moreIndicatorSample = "+99"; // 假设最多99个未显示的标签
+        // 预计算所有可以显示的标签
+        String moreIndicatorSample = "+99";
         int moreIndicatorWidth = font.width(moreIndicatorSample) + 6;
 
+        int totalWidth = 0;
+        int displayCount = 0;
+
+        // 计算实际需要的总宽度
         for (Tag tag : tags) {
             String tagName = tag.getName();
-            int tagWidth = font.width(tagName) + 8; // 4像素左右边距
+            int tagWidth = font.width(tagName) + 8;
 
-            // 检查是否还有足够空间显示这个标签
-            // 如果不是最后一个标签，需要预留"更多"指示器的空间
-            int remainingTags = tags.size() - displayCount - 1;
             int requiredSpace = tagWidth;
+            if (displayCount > 0) {
+                requiredSpace += tagSpacing;
+            }
 
+            // 检查是否还有剩余标签，如果有需要预留"更多"指示器空间
+            int remainingTags = tags.size() - displayCount - 1;
             if (remainingTags > 0) {
-                // 还有更多标签，需要预留"更多"指示器的空间
                 requiredSpace += tagSpacing + moreIndicatorWidth;
             }
 
-            if (currentX + requiredSpace > getX() + maxWidth) {
-                // 空间不够，显示"更多"指示器
-                if (displayCount < tags.size()) {
-                    String moreText = "+" + (tags.size() - displayCount);
-                    int actualMoreWidth = font.width(moreText) + 6;
-
-                    if (currentX + actualMoreWidth <= getX() + maxWidth) {
-                        // 绘制更多标签指示器
-                        guiGraphics.fill(currentX, currentY, currentX + actualMoreWidth, currentY + tagHeight, 0x80888888);
-                        guiGraphics.drawString(font, moreText, currentX + 3, currentY + 2, 0xFFFFFF);
-                    }
-                }
+            if (totalWidth + requiredSpace > maxWidth) {
                 break;
             }
 
+            totalWidth += (displayCount > 0 ? tagSpacing : 0) + tagWidth;
+            displayCount++;
+        }
+
+        // 如果有未显示的标签，添加"更多"指示器的宽度
+        boolean hasMoreTags = displayCount < tags.size();
+        if (hasMoreTags) {
+            String moreText = "+" + (tags.size() - displayCount);
+            int actualMoreWidth = font.width(moreText) + 6;
+            totalWidth += tagSpacing + actualMoreWidth;
+        }
+
+        // 根据对齐方式计算起始X坐标
+        int startX;
+        if (leftAlign) {
+            startX = getX();
+        } else {
+            // 居中对齐
+            startX = getX() + (maxWidth - totalWidth) / 2;
+        }
+
+        // 绘制标签
+        int currentX = startX;
+        int currentY = getY();
+
+        for (int i = 0; i < displayCount; i++) {
+            Tag tag = tags.get(i);
+            String tagName = tag.getName();
+            int tagWidth = font.width(tagName) + 8;
+
             // 绘制标签背景
-            int tagColor = tag.getColor() | 0x80000000; // 添加透明度
+            int tagColor = tag.getColor() | 0x80000000;
             guiGraphics.fill(currentX, currentY, currentX + tagWidth, currentY + tagHeight, tagColor);
 
             // 绘制标签边框
@@ -83,7 +109,16 @@ public class TagDisplayWidget extends AbstractWidget {
             guiGraphics.drawString(font, tagName, currentX + 4, currentY + 2, 0xFFFFFF);
 
             currentX += tagWidth + tagSpacing;
-            displayCount++;
+        }
+
+        // 绘制"更多"指示器
+        if (hasMoreTags) {
+            String moreText = "+" + (tags.size() - displayCount);
+            int actualMoreWidth = font.width(moreText) + 6;
+
+            // 绘制更多标签指示器
+            guiGraphics.fill(currentX, currentY, currentX + actualMoreWidth, currentY + tagHeight, 0x80888888);
+            guiGraphics.drawString(font, moreText, currentX + 3, currentY + 2, 0xFFFFFF);
         }
     }
 

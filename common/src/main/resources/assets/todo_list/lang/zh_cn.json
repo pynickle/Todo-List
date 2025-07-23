@@ -29,5 +29,7 @@
   "todo_list.search_hint": "搜索待办事项...",
   "todo_list.clear": "清除",
   "todo_list.search_results": "找到 %d 项，共 %d 项",
-  "todo_list.filtered_by_tags": "按 %d 个标签筛选"
+  "todo_list.filtered_by_tags": "按 %d 个标签筛选",
+  "todo_list.overlay_incomplete_only": "仅未完成",
+  "todo_list.overlay_show_all": "显示全部"
 }

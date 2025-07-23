@@ -29,5 +29,7 @@
   "todo_list.search_hint": "Search todo items...",
   "todo_list.clear": "Clear",
   "todo_list.search_results": "Found %d items out of %d",
-  "todo_list.filtered_by_tags": "Filtered by %d tags"
+  "todo_list.filtered_by_tags": "Filtered by %d tags",
+  "todo_list.overlay_incomplete_only": "Incomplete Only",
+  "todo_list.overlay_show_all": "Show All"
 }

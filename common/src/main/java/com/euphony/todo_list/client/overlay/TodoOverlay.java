@@ -15,6 +15,7 @@ import java.util.List;
  */
 public class TodoOverlay {
     private static boolean isVisible = false;
+    private static boolean showOnlyIncomplete = true; // 默认只显示未完成的todo
     private static final int OVERLAY_WIDTH = 180;  // 稍微缩小宽度
     private static final int MIN_HEIGHT = 40;      // 最小高度（只有标题）
     private static final int MAX_HEIGHT = 120;     // 最大高度上限
@@ -28,6 +29,18 @@ public class TodoOverlay {
 
     public static boolean isVisible() {
         return isVisible;
+    }
+
+    public static boolean isShowOnlyIncomplete() {
+        return showOnlyIncomplete;
+    }
+
+    public static void setShowOnlyIncomplete(boolean showOnlyIncomplete) {
+        TodoOverlay.showOnlyIncomplete = showOnlyIncomplete;
+    }
+
+    public static void toggleShowOnlyIncomplete() {
+        showOnlyIncomplete = !showOnlyIncomplete;
     }
 
     public static void render(GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
@@ -44,9 +57,19 @@ public class TodoOverlay {
         Font font = minecraft.font;
         int screenWidth = minecraft.getWindow().getGuiScaledWidth();
 
-        // 获取待办事项并计算动态高度
+        // 获取待办事项并应用过滤
         TodoListManager manager = TodoListManager.getInstance();
-        List<TodoItem> todoItems = manager.getAllTodoItems();
+        List<TodoItem> allTodoItems = manager.getAllTodoItems();
+
+        // 根据过滤设置获取要显示的项目
+        List<TodoItem> todoItems;
+        if (showOnlyIncomplete) {
+            todoItems = allTodoItems.stream()
+                    .filter(item -> !item.isCompleted())
+                    .toList();
+        } else {
+            todoItems = allTodoItems;
+        }
 
         // 动态计算悬浮窗高度
         int dynamicHeight = calculateOptimalHeight(todoItems.size());
@@ -101,10 +124,25 @@ public class TodoOverlay {
                 // 计算可用宽度：总宽度 - 复选框宽度 - 右边距
                 int availableWidth = OVERLAY_WIDTH - 16 - 8; // 16是复选框+间距，8是右边距
 
-                // 动态计算最大字符数
-                int maxLength = calculateMaxTextLength(font, title_text, availableWidth);
-                if (title_text.length() > maxLength && maxLength > 3) {
-                    title_text = title_text.substring(0, maxLength - 3) + "...";
+                // 动态计算文本截断
+                if (font.width(title_text) > availableWidth) {
+                    String ellipsis = "...";
+                    int ellipsisWidth = font.width(ellipsis);
+
+                    // 使用二分查找优化文本截断
+                    int left = 0, right = title_text.length();
+                    while (left < right) {
+                        int mid = (left + right + 1) / 2;
+                        String substr = title_text.substring(0, mid);
+                        if (font.width(substr) + ellipsisWidth <= availableWidth) {
+                            left = mid;
+                        } else {
+                            right = mid - 1;
+                        }
+                    }
+                    if (left > 0) {
+                        title_text = title_text.substring(0, left) + ellipsis;
+                    }
                 }
 
                 Component titleComponent = item.isCompleted() ?
@@ -139,28 +177,5 @@ public class TodoOverlay {
 
         // 限制在最大高度内
         return Math.min(requiredHeight, MAX_HEIGHT);
-    }
-
-    /**
-     * 计算给定文本在指定宽度内的最大字符数
-     */
-    private static int calculateMaxTextLength(Font font, String text, int maxWidth) {
-        int ellipsisWidth = font.width("..."); // 省略号的宽度
-        int textWidth = 0;
-        int charCount = 0;
-
-        // 遍历文本中的每个字符，计算宽度
-        for (char c : text.toCharArray()) {
-            textWidth += font.width(Character.toString(c));
-            charCount++;
-
-            // 如果当前字符数的宽度加上省略号的宽度超过最大宽度，返回当前字符数
-            if (textWidth + ellipsisWidth > maxWidth) {
-                return charCount;
-            }
-        }
-
-        // 如果没有超过最大宽度，返回文本的总字符数
-        return charCount;
     }
 }

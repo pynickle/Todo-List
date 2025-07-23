@@ -2,6 +2,7 @@ package com.euphony.todo_list.client.screen;
 
 import com.euphony.todo_list.client.components.TagDisplayWidget;
 import com.euphony.todo_list.client.overlay.TodoOverlay;
+import com.euphony.todo_list.config.TodoConfig;
 import com.euphony.todo_list.todo.Tag;
 import com.euphony.todo_list.todo.TodoItem;
 import com.euphony.todo_list.todo.TodoListManager;
@@ -88,6 +89,24 @@ public class TodoListViewScreen extends Screen {
         .build();
 
         this.addRenderableWidget(pinButton);
+
+        // 悬浮窗过滤开关 - 在pin按钮右侧
+        Button overlayFilterButton = Button.builder(
+            TodoOverlay.isShowOnlyIncomplete() ?
+                Component.translatable("todo_list.overlay_incomplete_only") :
+                Component.translatable("todo_list.overlay_show_all"),
+            button -> {
+                TodoOverlay.toggleShowOnlyIncomplete();
+                button.setMessage(TodoOverlay.isShowOnlyIncomplete() ?
+                    Component.translatable("todo_list.overlay_incomplete_only") :
+                    Component.translatable("todo_list.overlay_show_all"));
+            }
+        ).pos(75, 10)
+        .size(80, 20)
+        .build();
+
+        this.addRenderableWidget(overlayFilterButton);
+
         String searchText = searchBox != null ? searchBox.getValue() : "";
         filteredTodoItems = TodoListManager.getInstance().getFilteredTodoItems(filterTags, searchText);
 
@@ -106,6 +125,17 @@ public class TodoListViewScreen extends Screen {
 
     private List<AbstractWidget> renderTodoItems(int centerY) {
         List<AbstractWidget> widgets = new ArrayList<>();
+        TodoConfig config = TodoConfig.getInstance();
+        boolean isLeftAlign = config.getTextAlignment() == TodoConfig.TextAlignment.LEFT;
+
+        // 预先计算常用值，避免重复计算
+        int baseX = this.width / 2 - 90;
+        int checkboxX = this.width / 2 - 120;
+        int editBtnX = this.width / 2 + 70;
+        int deleteBtnX = this.width / 2 + 110;
+        final int availableWidth = 150;
+        final String ellipsis = "...";
+        final int ellipsisWidth = this.font.width(ellipsis);
 
         int displayIndex = 0;
         for(int itemIndex = 0; itemIndex < filteredTodoItems.size(); itemIndex++) {
@@ -113,68 +143,63 @@ public class TodoListViewScreen extends Screen {
 
             // 只显示在当前滚动范围内的项目
             if (!this.canScroll(filteredTodoItems.size()) || (itemIndex >= this.scrollOff && itemIndex < maxVisibleTodos + this.scrollOff)) {
-                int yPos = centerY - 50 + displayIndex * 35; // 增加行高以容纳标签
-
-                // 根据是否有标签来调整布局
+                int yPos = centerY - 50 + displayIndex * 35;
                 boolean hasTags = !todoItem.getTags().isEmpty();
 
-                if (hasTags) {
-                    // 待办事项标题 - 保持在顶部
-                    String titleText = todoItem.getTitle();
-                    int availableWidth = 150;
+                // 优化文本截断逻辑
+                String titleText = todoItem.getTitle();
+                int textWidth = this.font.width(titleText);
 
-                    // 截断过长的文本
-                    if (this.font.width(titleText) > availableWidth) {
-                        String ellipsis = "...";
-                        int ellipsisWidth = this.font.width(ellipsis);
-                        while (this.font.width(titleText) + ellipsisWidth > availableWidth && !titleText.isEmpty()) {
-                            titleText = titleText.substring(0, titleText.length() - 1);
+                if (textWidth > availableWidth) {
+                    // 使用二分查找优化文本截断
+                    int left = 0, right = titleText.length();
+                    while (left < right) {
+                        int mid = (left + right + 1) / 2;
+                        String substr = titleText.substring(0, mid);
+                        if (this.font.width(substr) + ellipsisWidth <= availableWidth) {
+                            left = mid;
+                        } else {
+                            right = mid - 1;
                         }
-                        titleText += ellipsis;
                     }
+                    titleText = titleText.substring(0, left) + ellipsis;
+                    textWidth = this.font.width(titleText); // 重新计算截断后的宽度
+                }
 
-                    Component titleComponent = todoItem.isCompleted() ?
-                        Component.literal("§m" + titleText) :
-                        Component.literal(titleText);
+                Component titleComponent = todoItem.isCompleted() ?
+                    Component.literal("§m" + titleText) :
+                    Component.literal(titleText);
 
-                    StringWidget titleWidget = new StringWidget(this.width / 2 - 90, yPos + 2, availableWidth, 12, titleComponent, this.font);
-                    widgets.add(titleWidget);
+                // 根据配置和是否有标签决定Y位置
+                int titleY = hasTags ? yPos + 2 : yPos + 8;
 
-                    // 标签显示 - 在标题下方
+                // 创建标题widget
+                StringWidget titleWidget;
+                if (isLeftAlign) {
+                    titleWidget = new StringWidget(baseX, titleY, availableWidth, 12, titleComponent, this.font);
+                    titleWidget.alignLeft();
+                } else {
+                    int centeredX = baseX + (availableWidth - textWidth) / 2;
+                    titleWidget = new StringWidget(centeredX, titleY, textWidth, 12, titleComponent, this.font);
+                }
+                widgets.add(titleWidget);
+
+                // 如果有标签，添加标签显示
+                if (hasTags) {
                     TagDisplayWidget tagDisplay = new TagDisplayWidget(
-                        this.width / 2 - 90, yPos + 14,
+                        baseX, yPos + 14,
                         150, 12,
-                        todoItem.getTags()
+                        todoItem.getTags(),
+                        isLeftAlign
                     );
                     widgets.add(tagDisplay);
-                } else {
-                    // 待办事项标题 - 单行居中
-                    String titleText = todoItem.getTitle();
-                    int availableWidth = 150; // 没有标签时可以用更多宽度
-
-                    // 截断过长的文本
-                    if (this.font.width(titleText) > availableWidth) {
-                        String ellipsis = "...";
-                        int ellipsisWidth = this.font.width(ellipsis);
-                        while (this.font.width(titleText) + ellipsisWidth > availableWidth && titleText.length() > 0) {
-                            titleText = titleText.substring(0, titleText.length() - 1);
-                        }
-                        titleText += ellipsis;
-                    }
-
-                    Component titleComponent = todoItem.isCompleted() ?
-                        Component.literal("§m" + titleText) :
-                        Component.literal(titleText);
-
-                    StringWidget titleWidget = new StringWidget(this.width / 2 - 90, yPos + 5, availableWidth, 12, titleComponent, this.font);
-                    widgets.add(titleWidget);
                 }
-                // 没有标签的情况：使用原始布局，所有元素在同一水平线
-                // 复选框 - 保持原始位置
+
+                // 复选框
                 Checkbox checkbox = Checkbox.builder(
                                 Component.empty(),
                                 this.font
-                        ).pos(this.width / 2 - 120, yPos + 5) // 使用原始的垂直对齐
+                        ).pos(checkboxX, yPos + 5)
                         .selected(todoItem.isCompleted())
                         .onValueChange((cb, selected) -> {
                             TodoListManager.getInstance().toggleCompleted(todoItem.getId());
@@ -182,23 +207,24 @@ public class TodoListViewScreen extends Screen {
                         })
                         .build();
                 widgets.add(checkbox);
-                // 编辑按钮 - 与文字对齐
+
+                // 编辑按钮
                 Button editBtn = Button.builder(
                                 Component.translatable("todo_list.edit"),
                                 button -> Minecraft.getInstance().setScreen(new TodoAddScreen(todoItem, this))
-                        ).pos(this.width / 2 + 70, yPos)
+                        ).pos(editBtnX, yPos)
                         .size(35, 20)
                         .build();
                 widgets.add(editBtn);
 
-                // 删除按钮 - 与文字对齐
+                // 删除按钮
                 Button deleteBtn = Button.builder(
                                 Component.translatable("todo_list.delete"),
                                 button -> {
                                     TodoListManager.getInstance().removeTodoItem(todoItem.getId());
                                     refreshTodoList();
                                 }
-                        ).pos(this.width / 2 + 110, yPos)
+                        ).pos(deleteBtnX, yPos)
                         .size(35, 20)
                         .build();
                 widgets.add(deleteBtn);
