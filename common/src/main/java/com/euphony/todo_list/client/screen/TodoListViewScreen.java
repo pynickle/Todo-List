@@ -27,6 +27,7 @@ public class TodoListViewScreen extends Screen {
     private List<TodoItem> filteredTodoItems = new ArrayList<>();
     private final int maxVisibleTodos = 4; // 最多显示4个todo
     private boolean isDragging = false; // 添加拖拽状态\
+    private List<AbstractWidget> todoRenderables = new ArrayList<>();
 
     public TodoListViewScreen(Screen parentScreen) {
         super(Component.translatable("todo_list.title"));
@@ -42,16 +43,11 @@ public class TodoListViewScreen extends Screen {
         // 搜索框
         searchBox = new EditBox(this.font, i - 120, 40, 200, 20, Component.translatable("todo_list.search"));
         searchBox.setHint(Component.translatable("todo_list.search_hint"));
+        // 添加实时搜索功能
+        searchBox.setResponder(text -> {
+            refreshTodoList();
+        });
         addRenderableWidget(searchBox);
-
-        // 搜索按钮
-        Button searchButton = Button.builder(
-            Component.translatable("todo_list.search"),
-            button -> refreshTodoList()
-        ).pos(i + 85, 40)
-        .size(50, 20)
-        .build();
-        addRenderableWidget(searchButton);
 
         // 清除搜索按钮
         Button clearButton = Button.builder(
@@ -61,7 +57,7 @@ public class TodoListViewScreen extends Screen {
                 filterTags.clear();
                 refreshTodoList();
             }
-        ).pos(i + 140, 40)
+        ).pos(i + 85, 40)
         .size(40, 20)
         .build();
         addRenderableWidget(clearButton);
@@ -107,11 +103,10 @@ public class TodoListViewScreen extends Screen {
 
         this.addRenderableWidget(overlayFilterButton);
 
-        String searchText = searchBox != null ? searchBox.getValue() : "";
-        filteredTodoItems = TodoListManager.getInstance().getFilteredTodoItems(filterTags, searchText);
+        filteredTodoItems = TodoListManager.getInstance().getFilteredTodoItems(filterTags, "");
 
-        List<AbstractWidget> widgets = renderTodoItems(this.height / 2);
-        for(AbstractWidget widget : widgets) {
+        todoRenderables = renderTodoItems(this.height / 2);
+        for(AbstractWidget widget : todoRenderables) {
             addRenderableWidget(widget);
         }
     }
@@ -119,8 +114,13 @@ public class TodoListViewScreen extends Screen {
     private void refreshTodoList() {
         String searchText = searchBox != null ? searchBox.getValue() : "";
         filteredTodoItems = TodoListManager.getInstance().getFilteredTodoItems(filterTags, searchText);
-        this.clearWidgets();
-        this.init();
+        for(AbstractWidget widget : todoRenderables) {
+            this.removeWidget(widget);
+        }
+        todoRenderables = renderTodoItems(this.height / 2);
+        for(AbstractWidget widget : todoRenderables) {
+            addRenderableWidget(widget);
+        }
     }
 
     private List<AbstractWidget> renderTodoItems(int centerY) {
