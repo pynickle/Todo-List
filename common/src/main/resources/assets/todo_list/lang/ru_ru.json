@@ -18,7 +18,7 @@
   "todo_list.description_label": "Описание",
   "todo_list.description_hint": "Сделать кое-что очень важное...",
   "todo_list.created_time": "Создано: %s",
-  "todo_list.instructions": "Кликните по чекбоксу слева от названия дела, чтобы отметить его как завершённое",
+  "todo_list.instructions": "Отметьте галочкой поле слева от названия дела, чтобы зачеркнуть его как завершённое",
   "todo_list.tags": "Тег",
   "todo_list.new_tag": "Новый тег...",
   "todo_list.search_tags": "Найти тег...",
